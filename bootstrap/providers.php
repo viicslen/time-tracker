@@ -2,5 +2,5 @@
 
 return [
     App\Providers\AppServiceProvider::class,
-    App\Providers\Filament\TasksPanelProvider::class,
+    App\Providers\Filament\MainPanelProvider::class,
 ];

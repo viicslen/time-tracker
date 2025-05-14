@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Events\TaskUpdateCreated;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -14,10 +15,15 @@ class TaskUpdate extends Model
         'description',
     ];
 
+    protected $dispatchesEvents = [
+        'created' => TaskUpdateCreated::class,
+    ];
+
     protected function casts(): array
     {
         return [
             'task_id' => 'integer',
+            'discord_webhook_enabled' => 'boolean',
         ];
     }
 

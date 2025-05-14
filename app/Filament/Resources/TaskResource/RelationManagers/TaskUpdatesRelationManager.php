@@ -1,8 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Filament\Resources\TaskResource\RelationManagers;
 
+use Filament\Forms\Components\MarkdownEditor;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\Toggle;
 use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Actions\BulkActionGroup;
@@ -22,11 +26,21 @@ class TaskUpdatesRelationManager extends RelationManager
         return $form
             ->schema([
                 Textarea::make('description')
+                    ->maxLength(1024)
+                    ->columnSpanFull()
                     ->rows(10)
                     ->autosize()
-                    ->required()
-                    ->maxLength(255)
+                    ->required(),
+
+                MarkdownEditor::make('context')
                     ->columnSpanFull(),
+
+                Toggle::make('discord_webhook_enabled')
+                    ->label('Discord Webhook')
+                    ->onIcon('heroicon-m-bell')
+                    ->onColor('success')
+                    ->offColor('danger')
+                    ->default(true)
             ]);
     }
 
@@ -36,14 +50,15 @@ class TaskUpdatesRelationManager extends RelationManager
             ->recordTitleAttribute('description')
             ->columns([
                 TextColumn::make('description')
-                    ->grow()
-                    ->searchable(),
+                    ->searchable()
+                    ->wrap()
+                    ->grow(),
 
                 TextColumn::make('created_at')
-                    ->since()
-                    ->sortable()
+                    ->dateTimeTooltip()
                     ->toggleable()
-                    ->dateTimeTooltip(),
+                    ->sortable()
+                    ->since(),
             ])
             ->headerActions([
                 CreateAction::make(),
