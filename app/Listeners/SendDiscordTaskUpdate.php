@@ -47,7 +47,7 @@ class SendDiscordTaskUpdate implements ShouldQueue
             "embeds" => [
                 [
                     "title" => $task->name,
-                    "description" => $task->description,
+                    "description" => null,
                     "color" => match ($task->status) {
                         TaskStatus::Pending => 0x60a5fa,
                         TaskStatus::InProgress => 0xfbbf24,
@@ -84,9 +84,11 @@ class SendDiscordTaskUpdate implements ShouldQueue
         }
 
         if ($event instanceof TaskUpdateCreated) {
+            $data['embeds'][0]['description'] = $event->update->description;
+        } else {
             $data['embeds'][0]['fields'][] = [
-                "name" => "Update",
-                "value" => $event->update->description,
+                "name" => "Description",
+                "value" => $task->description,
                 "inline" => false
             ];
         }
