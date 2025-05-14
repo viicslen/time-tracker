@@ -17,6 +17,7 @@ final class Project extends Model
     {
         return [
             'owner_id' => 'integer',
+            'discord_webhook_enabled' => 'boolean',
         ];
     }
 

@@ -1,17 +1,21 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\TaskResource\Pages;
+use App\Filament\Resources\TaskResource\Pages\CreateTask;
+use App\Filament\Resources\TaskResource\Pages\EditTask;
+use App\Filament\Resources\TaskResource\Pages\ListTasks;
 use App\Filament\Resources\TaskResource\RelationManagers\TaskUpdatesRelationManager;
 use App\Enums\TaskStatus;
 use App\Models\Task;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\Toggle;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
-use Filament\Tables;
 use Filament\Tables\Actions\BulkActionGroup;
 use Filament\Tables\Actions\DeleteAction;
 use Filament\Tables\Actions\DeleteBulkAction;
@@ -24,14 +28,16 @@ class TaskResource extends Resource
 {
     protected static ?string $model = Task::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
 
     /**
      * @return array<array-key,array>
      */
     protected static function statuses(): array
     {
-        return array_merge(...array_map(static fn(TaskStatus $case) => [$case->value => $case->name], TaskStatus::cases()));
+        return array_merge(...array_map(static fn(TaskStatus $case) => [
+            $case->value => $case->label(),
+        ], TaskStatus::cases()));
     }
 
     public static function form(Form $form): Form
@@ -39,33 +45,44 @@ class TaskResource extends Resource
         return $form
             ->schema([
                 TextInput::make('name')
-                    ->required()
-                    ->maxLength(50)
-                    ->columnSpan(2),
+                    ->maxLength(255)
+                    ->columnSpan(2)
+                    ->required(),
 
                 Select::make('status')
-                    ->required()
+                    ->options(self::statuses())
                     ->native(false)
-                    ->options(self::statuses()),
+                    ->required(),
 
                 Select::make('project_id')
-                    ->label('Project')
-                    ->searchable(['name', 'description'])
+                    ->manageOptionForm([
+                        TextInput::make('name')
+                            ->maxLength(255)
+                            ->required(),
+
+                        Textarea::make('description')
+                            ->maxLength(1024),
+
+                        Toggle::make('discord_webhook_enabled')
+                            ->label('Enable Discord Webhooks')
+                            ->onIcon('heroicon-m-bell')
+                            ->onColor('success')
+                            ->default(false),
+
+                        TextInput::make('discord_webhook_url')
+                            ->placeholder('https://discord.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ')
+                            ->label('Discord Webhook URL')
+                            ->maxLength(2048),
+                    ])
                     ->relationship('project', 'name')
-                    ->createOptionForm([
-                        TextInput::make('name')->required(),
-                        Textarea::make('description'),
-                    ])
-                    ->editOptionForm([
-                        TextInput::make('name')->required(),
-                        Textarea::make('description'),
-                    ])
+                    ->searchable(['name', 'description'])
+                    ->label('Project')
                     ->preload(),
 
                 Textarea::make('description')
-                    ->maxLength(255)
-                    ->autosize()
-                    ->columnSpanFull(),
+                    ->maxLength(1024)
+                    ->columnSpanFull()
+                    ->autosize(),
             ]);
     }
 
@@ -74,33 +91,40 @@ class TaskResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('status')
-                    ->badge()
-                    ->sortable()
+                    ->formatStateUsing(fn (TaskStatus $state): string => __($state->label()))
                     ->color(fn (TaskStatus $state): string => match ($state) {
                         TaskStatus::Pending => 'info',
                         TaskStatus::InProgress => 'warning',
                         TaskStatus::Completed => 'success',
-                    }),
+                    })
+                    ->sortable()
+                    ->badge(),
 
                 TextColumn::make('name')
-                    ->grow()
-                    ->sortable()
+                    ->description(fn (Task $record): ?string => $record->description)
                     ->searchable()
-                    ->description(fn (Task $record): ?string => $record->description),
+                    ->sortable()
+                    ->grow(),
 
                 TextColumn::make('project.name')
-                    ->sortable()
                     ->toggleable()
-                    ->searchable(),
+                    ->searchable()
+                    ->sortable(),
 
                 TextColumn::make('created_at')
-                    ->since()
-                    ->sortable()
+                    ->dateTimeTooltip()
                     ->toggleable()
-                    ->dateTimeTooltip(),
+                    ->sortable()
+                    ->since(),
             ])
             ->filters([
-                SelectFilter::make('status')->options(self::statuses()),
+                SelectFilter::make('status')
+                    ->options(self::statuses())
+                    ->default([
+                        TaskStatus::Pending->value,
+                        TaskStatus::InProgress->value,
+                    ])
+                    ->multiple(),
             ])
             ->actions([
                 EditAction::make(),
@@ -110,7 +134,8 @@ class TaskResource extends Resource
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
                 ]),
-            ]);
+            ])
+            ->defaultSort('status', 'desc');
     }
 
     public static function getRelations(): array
@@ -123,9 +148,22 @@ class TaskResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListTasks::route('/'),
-            'create' => Pages\CreateTask::route('/create'),
-            'edit' => Pages\EditTask::route('/{record}/edit'),
+            'index' => ListTasks::route('/'),
+            'create' => CreateTask::route('/create'),
+            'edit' => EditTask::route('/{record}/edit'),
         ];
+    }
+
+    public static function getNavigationBadge(): ?string
+    {
+        /** @var class-string<Task> $model */
+        $model = static::getModel();
+
+        return (string) $model::where('status', '!=', TaskStatus::Completed)->count();
+    }
+
+    public static function getNavigationBadgeTooltip(): ?string
+    {
+        return 'The number of pending and in-progress tasks';
     }
 }
